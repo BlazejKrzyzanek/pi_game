@@ -10,7 +10,12 @@ my1 = [0.33,0,-1,0,1,-1,0,0,-1,0,1]
 my2 = [0.25,0,1,0,1,1,-1,1,-1,0,1,0,1,0]
 mozart_40 = [0.2,1,0,0,-1,1,0,0,-1,1,0,0,-1,1]
 turkish_march = [0.16,1,0,1,0,1,-1,-1,-1,1,0,1,0,1,-1,-1,-1,1,0,1,0,1,0,1,0,1,0,1,0,1]
+
 songs = [tutorial0,tutorial1,tutorial2,neighbours,my1,my2,mozart_40,turkish_march]
+
+sound_start = [523, 554, 587, 622, 659, 698, 740, 784, 830, 880]
+sound_repeat = [880, 740, 880]
+sound_end = [880, 830, 784, 740, 698, 659, 622, 587, 554, 523]
 
 GPIO.setmode(GPIO.BCM)
 # speaker
@@ -22,16 +27,40 @@ GPIO.setup(14, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(15, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 song_index = 0
+repeating = False
+repeat = []
+last_repeat = time.time()
 
 def lcd_write(text):
     print(text)
+    
+def show_song():
+    global song_index
+    if song_index >= len(songs):
+        song_index = 0
+    elif song_index < 0:
+        song_index = len(songs)-1
+    text = "Song " + str(song_index + 1)
+    lcd_write(text)
+
+def play_sound(sound, delay=0.5):
+    pwm.stop()
+    time.sleep(delay)
+    pwm.start(10)
+    for s_index in range(len(sound)):
+        pwm.ChangeFrequency(sound[s_index])
+        time.sleep(0.1)
+    pwm.stop()
 
 def play_song(song):
-    can_play = False
-    pwm.stop()
+    global repeating
+    global last_repeat
+    play_sound(sound_start, 1)
+    time.sleep(1)
+    
     playing = -1
     last_start = time.time() - 20
-    pwm.start(10) # 10% duty cycle sounds 'ok'
+    pwm.start(10)
     song_index = 1
     interval = song[0]
     while True:
@@ -51,39 +80,70 @@ def play_song(song):
             last_start =  time.time()
             song_index+=1
     pwm.stop()
-    can_play = True
+    
+    play_sound(sound_repeat, 1)
+    time.sleep(1)
+    
+    repeat.clear()
+    repeating = True
+    last_repeat = time.time() + 10
+
+def on_repeat(key):
+    global repeating
+    global last_repeat
+    if repeating == False:
+        return
+    repeat.append((time.time(),key))
+    last_repeat = time.time()
+
+def show_score():
+    global repeating
+    global sound_end
+    play_sound(sound_end)
+    repeating = False
+    print(repeat)
 
 def change_input(key, previous_key=-1):
+    global repeating
     global song_index
     if key == 0:
-        song_index += 1
-        if song_index >= len(songs):
-            song_index = 0
-        text = "Song " + str(song_index + 1)
-        lcd_write(text)
+        song_index -= 1
+        if not repeating:
+            show_song()
         pwm.start(10)
         pwm.ChangeFrequency(freqs[0])
+        on_repeat(0)
         
     elif key == 1:
+        song_index += 1
+        if not repeating:
+            show_song()
         pwm.start(10)
         pwm.ChangeFrequency(freqs[1])
+        on_repeat(1)
     
     elif key == 2:
         pwm.stop()
-        play_song(songs[song_index])
+        if not repeating:
+            play_song(songs[song_index])
             
     elif key == -1:
         pwm.stop()
+        on_repeat(-1)
 
 def menu_loop():
+    global last_repeat
+    show_song()
     pwm.stop()
-    can_play = True
         
     last_key = -1
     last_change = time.time()
     while True:
         if time.time() - last_change < 0.08:
             continue
+        
+        if repeating and time.time() - last_repeat > 3:
+            show_score()
         
         if GPIO.input(14) == GPIO.HIGH and GPIO.input(15) == GPIO.HIGH:
             if last_key == 2:
