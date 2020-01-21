@@ -1,24 +1,40 @@
-# import modules
-import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO 
+import time 
 
-import time
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(12, GPIO.OUT)
+p = GPIO.PWM(12, 100)
 
-# setup pins
-GPIO.setmode(GPIO.BOARD)
-GPIO.setup(3, GPIO.OUT)
-GPIO.setup(5, GPIO.IN)
+c4 = 261
+d4 = 294
+e4 = 329
+f4 = 349
+g4 = 392
+a4 = 440
+b4 = 493
+c5 = 523.25
 
-# loop 5 times
-for i in range(5):
+speed = 0.1
 
-    # flash output pin 3
-    GPIO.output(3, GPIO.HIGH)
-    time.sleep(1)
-    GPIO.output(3, GPIO.LOW)
-    time.sleep(1)
+GPIO.output(12, True) 
+p.start(10) # 10% duty cycle sounds 'ok'
 
-    # read input pin 5
-    if GPIO.input(5) == GPIO.HIGH:
-        print("Pin 5 is on")
-    else:
-        print("Pin 5 is off")
+p.ChangeFrequency(c4)
+time.sleep(speed)
+p.ChangeFrequency(d4)  
+time.sleep(speed)
+p.ChangeFrequency(e4)   
+time.sleep(speed)
+p.ChangeFrequency(f4)  
+time.sleep(speed)
+p.ChangeFrequency(g4)    
+time.sleep(speed)
+p.ChangeFrequency(a4)    
+time.sleep(speed)
+p.ChangeFrequency(b4)    
+time.sleep(speed)
+p.ChangeFrequency(c5)    
+time.sleep(speed)
+
+p.stop()
+GPIO.cleanup()
