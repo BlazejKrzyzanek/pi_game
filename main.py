@@ -1,5 +1,6 @@
 import RPi.GPIO as GPIO 
 import time
+import lcddriver
 
 freqs = [261, 392]
 tutorial0 = [1,1,0,1,0]
@@ -20,11 +21,13 @@ sound_end = [880, 830, 784, 740, 698, 659, 622, 587, 554, 523]
 GPIO.setmode(GPIO.BCM)
 # speaker
 GPIO.setup(12, GPIO.OUT)
-pwm = GPIO.PWM(12, 100)
+pwm = GPIO.PWM(12, 50)
 GPIO.output(12, True)
 # buttons
 GPIO.setup(14, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(15, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+# lcd
+display = lcddriver.lcd()
 
 song_index = 0
 repeating = False
@@ -32,7 +35,8 @@ repeat = []
 last_repeat = time.time()
 
 def lcd_write(text):
-    print(text)
+    display.lcd_clear()
+    display.lcd_display_string(str(text), 1) # Write line of text to first line of display
     
 def show_song():
     global song_index
@@ -93,30 +97,76 @@ def on_repeat(key):
     global last_repeat
     if repeating == False:
         return
-    repeat.append((time.time(),key))
+    repeat.append([time.time(),key])
     last_repeat = time.time()
 
 def show_score():
     global repeating
     global sound_end
+    global repeat
     play_sound(sound_end)
     repeating = False
+    if repeat[0][1] == -1:
+        repeat = repeat[1:]
+        
+    s = repeat[0][0]
+    for i in range(len(repeat)):
+        repeat[i][0] -= s
+    l = repeat[len(repeat)-1][0]
+    if l==0:
+        l=1
+    for i in range(len(repeat)):
+        repeat[i][0] /= l
+        
+    sg = songs[song_index][1:]
+    srepeat = []
+    for i in range(len(sg)):
+        if sg[i] != -1:
+            srepeat.append([i,sg[i]])
+            srepeat.append([i+0.85,-1])
+    for i in range(len(srepeat)):
+        srepeat[i][0]/=srepeat[len(srepeat)-1][0]
+        
+    print(srepeat)
     print(repeat)
+    srepeat.append([100,-2])
+    repeat.append([100,-2])
+    score = 0
+    i_s = 0
+    i_r = 0
+    p_lim = 0
+    while not(i_r == len(repeat)-2 and i_s == len(srepeat)-2):
+        if srepeat[i_s+1][0] < repeat[i_r+1][0]:
+            lim = srepeat[i_s+1][0]            
+            dif = lim - p_lim
+            p_lim = lim
+            if srepeat[i_s][1] == repeat[i_r][1]:
+                score += dif
+            i_s += 1
+        else:
+            lim = repeat[i_r+1][0]            
+            dif = lim - p_lim
+            p_lim = lim
+            if srepeat[i_s][1] == repeat[i_r][1]:
+                score += dif
+            i_r += 1
+    
+    lcd_write(str(int(score*100))+"%")
 
 def change_input(key, previous_key=-1):
     global repeating
     global song_index
     if key == 0:
-        song_index -= 1
         if not repeating:
+            song_index -= 1
             show_song()
         pwm.start(10)
         pwm.ChangeFrequency(freqs[0])
         on_repeat(0)
         
     elif key == 1:
-        song_index += 1
         if not repeating:
+            song_index += 1
             show_song()
         pwm.start(10)
         pwm.ChangeFrequency(freqs[1])
